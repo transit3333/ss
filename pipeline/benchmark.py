@@ -9,10 +9,34 @@ from pipeline.db import get_connection, init_db
 from pipeline.live_model import _parse_time, build_live_cost_model
 from pipeline.lcb_advantage_ssp import LCBAdvantageSSP
 from pipeline.ssp_env import MetroSSPEnvironment
-from pipeline.topology import build_topology, resolve_station_candidates, shortest_hops
+from pipeline.topology import build_topology, normalize_station_name, resolve_station_candidates, shortest_hops
 
 
-def _pick_station_pair(topology, from_query: str, to_query: str) -> tuple[str, str]:
+def _resolution_details(topology, query: str, candidates: list[str]) -> dict:
+    normalized_query = normalize_station_name(query)
+    resolved = []
+    exact = []
+    for key in candidates:
+        station_name = topology.station_names.get(key, key)
+        normalized_station = normalize_station_name(station_name)
+        item = {
+            "key": key,
+            "station": station_name,
+            "normalized_station": normalized_station,
+            "exact_match": normalized_station == normalized_query,
+        }
+        resolved.append(item)
+        if item["exact_match"]:
+            exact.append(item)
+    return {
+        "query": query,
+        "normalized_query": normalized_query,
+        "candidates": resolved,
+        "exact_matches": exact,
+    }
+
+
+def _pick_station_pair(topology, from_query: str, to_query: str) -> tuple[str, str, dict]:
     from_candidates = resolve_station_candidates(topology, from_query)
     to_candidates = resolve_station_candidates(topology, to_query)
     best_pair = None
@@ -29,7 +53,15 @@ def _pick_station_pair(topology, from_query: str, to_query: str) -> tuple[str, s
 
     if best_pair is None:
         raise ValueError(f"Could not resolve connected station pair for '{from_query}' -> '{to_query}'.")
-    return best_pair
+    return (
+        best_pair[0],
+        best_pair[1],
+        {
+            "from": _resolution_details(topology, from_query, from_candidates),
+            "to": _resolution_details(topology, to_query, to_candidates),
+            "chosen_pair_hops": best_hops,
+        },
+    )
 
 
 def _serialize_steps(topology, cost_model, start_key: str, edge_path) -> list[dict]:
@@ -54,10 +86,12 @@ def _serialize_steps(topology, cost_model, start_key: str, edge_path) -> list[di
 
 def _path_summary(steps: list[dict], goal_key: str, start_key: str) -> dict:
     end_key = steps[-1]["to_key"] if steps else start_key
+    reaches_goal = end_key == goal_key
     return {
-        "reaches_goal": end_key == goal_key,
+        "reaches_goal": reaches_goal,
         "step_count": len(steps),
         "transfer_count": sum(1 for step in steps if step["via_transfer"]),
+        "end_key": end_key,
         "estimated_total_cost_minutes": round(sum(step["estimated_cost"] for step in steps), 3),
         "steps": steps,
     }
@@ -158,16 +192,22 @@ def _compare_window(
 
     ssp_summary = _path_summary(ssp_steps, goal_key, start_key)
     bfs_summary = _path_summary(bfs_steps, goal_key, start_key)
-    cost_delta = round(
-        ssp_summary["estimated_total_cost_minutes"] - bfs_summary["estimated_total_cost_minutes"],
-        3,
-    )
-    if cost_delta < 0:
-        winner = "ssp"
-    elif cost_delta > 0:
-        winner = "bfs"
+
+    comparison_valid = ssp_summary["reaches_goal"] and bfs_summary["reaches_goal"]
+    if comparison_valid:
+        cost_delta = round(
+            ssp_summary["estimated_total_cost_minutes"] - bfs_summary["estimated_total_cost_minutes"],
+            3,
+        )
+        if cost_delta < 0:
+            winner = "ssp"
+        elif cost_delta > 0:
+            winner = "bfs"
+        else:
+            winner = "tie"
     else:
-        winner = "tie"
+        cost_delta = None
+        winner = "invalid"
 
     return {
         "window_hours": hours,
@@ -176,6 +216,7 @@ def _compare_window(
         "window_end_utc": latest.isoformat(),
         "arrival_rows": arrival_rows,
         "history_hours_available": round((latest - earliest).total_seconds() / 3600.0, 3),
+        "comparison_valid": comparison_valid,
         "ssp": ssp_summary,
         "bfs": bfs_summary,
         "winner_by_estimated_cost": winner,
@@ -201,7 +242,7 @@ def main() -> None:
         raise SystemExit("No arrival history found in cta_data.db.")
 
     topology = build_topology()
-    start_key, goal_key = _pick_station_pair(topology, args.from_station, args.to_station)
+    start_key, goal_key, resolution = _pick_station_pair(topology, args.from_station, args.to_station)
     windows = [int(item.strip()) for item in args.windows.split(",") if item.strip()]
 
     results = [
@@ -225,6 +266,7 @@ def main() -> None:
         "goal_key": goal_key,
         "start_station": topology.station_names[start_key],
         "goal_station": topology.station_names[goal_key],
+        "resolution": resolution,
         "history": {
             "earliest_arrival_utc": earliest.isoformat(),
             "latest_arrival_utc": latest.isoformat(),

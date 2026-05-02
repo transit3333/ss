@@ -38,6 +38,7 @@ MANUAL_STATION_ALIASES = {
     "ciocero": "cicero",
     "ridgland": "ridgeland",
     "belmort": "belmont",
+    "kimbal": "kimball",
     "merchmart": "merchandisemart",
     "westem": "western",
     "westtern": "western",
@@ -47,6 +48,8 @@ MANUAL_STATION_ALIASES = {
     "thomdale": "thorndale",
     "clarklake": "clarklake",
     "cermakmccormickplace": "cermakmccormickplace",
+    "96thdanryan": "95thdanryan",
+    "sox36th": "sox35th",
 }
 
 

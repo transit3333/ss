@@ -84,12 +84,43 @@ def _compute_wait_minutes(collected_raw: str | None, predicted_raw: str | None) 
 
 
 class EmpiricalLiveCostModel:
-    def __init__(self, station_aliases, station_route_samples, route_fallbacks, ride_minutes=2.0, transfer_minutes=3.0):
+    def __init__(
+        self,
+        station_aliases,
+        station_route_samples,
+        route_fallbacks,
+        edge_travel_samples,
+        route_edge_fallbacks,
+        ride_minutes=2.0,
+        transfer_minutes=3.0,
+    ):
         self.station_aliases = station_aliases
         self.station_route_samples = station_route_samples
         self.route_fallbacks = route_fallbacks
+        self.edge_travel_samples = edge_travel_samples
+        self.route_edge_fallbacks = route_edge_fallbacks
         self.ride_minutes = ride_minutes
         self.transfer_minutes = transfer_minutes
+
+    def _edge_travel_series(self, state_key, edge):
+        from_token = self.station_aliases.get(state_key)
+        to_token = self.station_aliases.get(edge.to_key)
+        samples = self.edge_travel_samples.get((from_token, to_token, edge.route_code), [])
+        if not samples:
+            samples = self.route_edge_fallbacks.get(edge.route_code, [])
+        return samples
+
+    def sample_edge_minutes(self, state_key, edge, rng: random.Random) -> float:
+        if edge.via_transfer:
+            return self.transfer_minutes
+        samples = self._edge_travel_series(state_key, edge)
+        return max(0.5, rng.choice(samples) if samples else self.ride_minutes)
+
+    def estimate_edge_minutes(self, state_key, edge) -> float:
+        if edge.via_transfer:
+            return self.transfer_minutes
+        samples = self._edge_travel_series(state_key, edge)
+        return max(0.5, statistics.median(samples) if samples else self.ride_minutes)
 
     def sample_cost(self, state_key, edge, rng: random.Random) -> float:
         if edge.via_transfer:
@@ -101,7 +132,8 @@ class EmpiricalLiveCostModel:
             samples = self.route_fallbacks.get(edge.route_code, [])
 
         wait_minutes = rng.choice(samples) if samples else 8.0
-        return max(0.25, wait_minutes) + self.ride_minutes
+        edge_minutes = self.sample_edge_minutes(state_key, edge, rng)
+        return max(0.25, wait_minutes) + edge_minutes
 
     def estimate_cost(self, state_key, edge) -> float:
         if edge.via_transfer:
@@ -113,13 +145,26 @@ class EmpiricalLiveCostModel:
             samples = self.route_fallbacks.get(edge.route_code, [])
 
         wait_minutes = statistics.median(samples) if samples else 8.0
-        return max(0.25, wait_minutes) + self.ride_minutes
+        edge_minutes = self.estimate_edge_minutes(state_key, edge)
+        return max(0.25, wait_minutes) + edge_minutes
+
+    def state_profile(self, station_key, edges) -> tuple:
+        ride_estimates = [
+            self.estimate_edge_minutes(station_key, edge)
+            for edge in edges
+            if not edge.via_transfer
+        ]
+        ride_estimates.sort()
+        nearby = tuple(int(round(value * 2)) for value in ride_estimates[:3])
+        transfer_count = sum(1 for edge in edges if edge.via_transfer)
+        return nearby + (transfer_count,)
 
 
 def _model_from_rows(topology, arrival_rows) -> EmpiricalLiveCostModel:
     live_station_tokens = {}
     station_route_samples = {}
     route_fallbacks = {}
+    grouped_arrivals = {}
 
     for row in arrival_rows:
         station_name = row["station_name"]
@@ -138,6 +183,18 @@ def _model_from_rows(topology, arrival_rows) -> EmpiricalLiveCostModel:
         station_route_samples.setdefault((token, route_code), []).append(wait_minutes)
         route_fallbacks.setdefault(route_code, []).append(wait_minutes)
 
+        run_number = (row["run_number"] or "").strip() if "run_number" in row.keys() else ""
+        predicted_at = _parse_time(row["predicted_arrival"])
+        collected_at = _parse_time(row["collected_at"])
+        if not run_number or not predicted_at or not collected_at:
+            continue
+
+        grouped_key = (row["collected_at"], route_code, run_number)
+        station_map = grouped_arrivals.setdefault(grouped_key, {})
+        existing = station_map.get(token)
+        if existing is None or predicted_at < existing:
+            station_map[token] = predicted_at
+
     station_aliases = {}
     for station_key, station_name in topology.station_names.items():
         token = normalize_station_name(station_name)
@@ -155,10 +212,43 @@ def _model_from_rows(topology, arrival_rows) -> EmpiricalLiveCostModel:
                 best_token = candidate
         station_aliases[station_key] = best_token or token
 
+    valid_edge_tokens = {}
+    for station_key, edges in topology.graph.items():
+        from_token = station_aliases.get(station_key)
+        if not from_token:
+            continue
+        for edge in edges:
+            if edge.via_transfer or not edge.route_code:
+                continue
+            to_token = station_aliases.get(edge.to_key)
+            if not to_token:
+                continue
+            valid_edge_tokens[(from_token, to_token, edge.route_code)] = True
+
+    edge_travel_samples = {}
+    route_edge_fallbacks = {}
+    for (collected_at_raw, route_code, run_number), station_map in grouped_arrivals.items():
+        del collected_at_raw, run_number
+        if len(station_map) < 2:
+            continue
+        for from_token, predicted_from in station_map.items():
+            for to_token, predicted_to in station_map.items():
+                if from_token == to_token:
+                    continue
+                edge_key = (from_token, to_token, route_code)
+                if edge_key not in valid_edge_tokens:
+                    continue
+                travel_minutes = (predicted_to - predicted_from).total_seconds() / 60.0
+                if 0.25 <= travel_minutes <= 45.0:
+                    edge_travel_samples.setdefault(edge_key, []).append(travel_minutes)
+                    route_edge_fallbacks.setdefault(route_code, []).append(travel_minutes)
+
     return EmpiricalLiveCostModel(
         station_aliases=station_aliases,
         station_route_samples=station_route_samples,
         route_fallbacks=route_fallbacks,
+        edge_travel_samples=edge_travel_samples,
+        route_edge_fallbacks=route_edge_fallbacks,
     )
 
 
@@ -181,7 +271,7 @@ def build_live_cost_model(
     where_sql = " AND ".join(clauses)
     arrival_rows = conn.execute(
         f"""
-        SELECT station_name, route, collected_at, predicted_arrival
+        SELECT station_name, route, collected_at, predicted_arrival, run_number
         FROM train_arrivals
         WHERE {where_sql}
         """,
