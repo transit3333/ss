@@ -627,8 +627,21 @@ p.desc {
     padding-top: 14px;
 }
 
+.live-planner-section {
+    border-top: 1px solid var(--border-primary);
+    padding-top: 14px;
+}
+
 .route-finder-section h3 {
     background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 1rem !important;
+}
+
+.live-planner-section h3 {
+    background: linear-gradient(135deg, #22c55e, #0ea5e9);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -823,6 +836,40 @@ p.desc {
 /* Route result display */
 .route-result {
     margin-top: 8px;
+}
+
+.live-summary-meta {
+    display: grid;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: 2px 4px 0 4px;
+}
+
+.live-plan-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(250, 204, 21, 0.12);
+    border: 1px solid rgba(250, 204, 21, 0.24);
+    color: #eab308;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.live-plan-badge.line {
+    color: #ffffff;
+    border: none;
+}
+
+.live-plan-cost {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-weight: 600;
 }
 
 .route-error {

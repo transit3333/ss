@@ -99,6 +99,19 @@
                 <div id="routeResult" class="route-result"></div>
             </div>
 
+            <div class="tool-section live-planner-section">
+                <h3>Live SSP</h3>
+                <div class="route-form">
+                    <div style="display: flex; gap: 8px;">
+                        <button id="loadLiveSnapshotBtn" class="btn-find-route" style="flex: 1;">Load Live Data</button>
+                        <button id="loadSspPlanBtn" class="btn-pick" style="flex: 1; height: auto;">Load SSP Plan</button>
+                    </div>
+                    <button id="clearLivePlanBtn" class="btn-clear-route" style="display:none;">Clear Live Plan</button>
+                </div>
+                <div id="liveDataStatus" class="route-result"></div>
+                <div id="sspPlanResult" class="route-result"></div>
+            </div>
+
             <div class="tool-section admin-only">
                 <h3>Track Stations</h3>
                 <div id="trackList" style="color: #94a3b8; font-size: 0.9rem;">No tracks placed.</div>
@@ -211,6 +224,7 @@
     <script src="js/toolbar.js"></script>
     <script src="js/keyboard.js"></script>
     <script src="js/refimage.js"></script>
+    <script src="js/liveplanner.js"></script>
     <script src="js/main.js"></script>
 </body>
 

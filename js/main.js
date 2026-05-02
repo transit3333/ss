@@ -31,6 +31,7 @@ function initApp() {
     initTheme();
     initToolbar();
     initViewport();
+    if (typeof initLivePlanner === 'function') initLivePlanner();
     const rect = viewport.getBoundingClientRect();
     cameraX = rect.width / 2;
     cameraY = rect.height / 2;
