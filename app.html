@@ -4,228 +4,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metro Map Builder</title>
+    <title>Metro Real Map</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <script>
-        // Auth guard: redirect to login if not authenticated
-        if (sessionStorage.getItem('metro_auth') !== 'true') {
-            window.location.replace('index.html');
-        }
-    </script>
-
-    <div class="header">
-        <div class="header-left">
-            <h1>Metro Architect</h1>
-            <p class="desc">Left Click to Draw | Middle/Right Click to Pan | Scroll to Zoom</p>
-        </div>
-        <div class="header-right">
-            <div class="save-load-group">
-                <button id="saveMapBtn" class="btn-save" title="Ctrl+S">💾 Save (Ctrl+S)</button>
-                <button id="loadMapBtn" class="btn-load" title="Ctrl+O">📂 Load (Ctrl+O)</button>
-                <input type="file" id="loadMapFile" accept=".json" style="display: none;">
-            </div>
-            <button id="clearBtn" class="btn-clear" title="Ctrl+E">🗑️ Clear (Ctrl+E)</button>
-            <button id="themeToggle" class="theme-toggle" title="Toggle Dark/Light Mode">🌙</button>
-        </div>
-    </div>
-
-    <div class="app-container">
-        <!-- Sidebar Toolbar -->
-        <div class="toolbar">
-            <div class="tool-section">
-                <h3>Line Color</h3>
-                <div class="color-palette" id="colorPalette"></div>
-            </div>
-
-            <div class="tool-section" style="margin-top: auto;">
-                <h3>Track Style</h3>
-                <div id="trackPalette"></div>
-            </div>
-        </div>
-
-        <!-- Infinite Drawing Grid -->
-        <div id="grid-viewport" class="grid-viewport">
-            <div id="grid-canvas" class="grid-canvas">
-                <svg id="connections-layer" overflow="visible"></svg>
-                <div id="grid-cursor-highlight"></div>
-                <img id="ref-image" style="display: none;">
-            </div>
-            <div id="grid-preview" class="grid-preview"></div>
-        </div>
-
-        <!-- Right Panel for Station List -->
-        <div class="right-panel" id="rightPanel">
-            <!-- Route Finder Section -->
-            <div class="tool-section route-finder-section">
-                <h3>🚇 Find Route</h3>
-                <div class="route-form">
-                    <div class="route-field">
-                        <label>Exclude Lines</label>
-                        <div class="color-exclude-palette" id="routeExcludePalette"></div>
-                    </div>
-                    <div class="route-field">
-                        <label for="routeFrom">From</label>
-                        <div style="display:flex;gap:5px;width:100%;">
-                            <select id="routeFrom" class="route-select" style="flex:1;">
-                                <option value="">-- Select Station --</option>
-                            </select>
-                            <button id="pickFromBtn" class="btn-pick" title="Pick from map">📍</button>
-                        </div>
-                    </div>
-                    <div class="route-swap-btn" id="routeSwapBtn" title="Swap stations">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
-                        </svg>
-                    </div>
-                    <div class="route-field">
-                        <label for="routeTo">To</label>
-                        <div style="display:flex;gap:5px;width:100%;">
-                            <select id="routeTo" class="route-select" style="flex:1;">
-                                <option value="">-- Select Station --</option>
-                            </select>
-                            <button id="pickToBtn" class="btn-pick" title="Pick from map">📍</button>
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 8px; margin-top: 8px;">
-                        <button id="findRouteBtn" class="btn-find-route" style="flex: 2;" title="Press Enter">Find Route (Enter)</button>
-                        <button id="randomRouteBtn" class="btn-pick" style="flex: 1; height: auto;" title="Random route">🎲 Random</button>
-                    </div>
-                    <button id="clearRouteBtn" class="btn-clear-route" style="display:none;">Clear Route</button>
-                </div>
-                <div id="routeResult" class="route-result"></div>
-            </div>
-
-            <div class="tool-section live-planner-section">
-                <h3>Live SSP</h3>
-                <div class="route-form">
-                    <div style="display: flex; gap: 8px;">
-                        <button id="loadLiveSnapshotBtn" class="btn-find-route" style="flex: 1;">Load Live Data</button>
-                        <button id="loadSspPlanBtn" class="btn-pick" style="flex: 1; height: auto;">Load SSP Plan</button>
-                    </div>
-                    <button id="clearLivePlanBtn" class="btn-clear-route" style="display:none;">Clear Live Plan</button>
-                </div>
-                <div id="liveDataStatus" class="route-result"></div>
-                <div id="sspPlanResult" class="route-result"></div>
-            </div>
-
-            <div class="tool-section admin-only">
-                <h3>Track Stations</h3>
-                <div id="trackList" style="color: #94a3b8; font-size: 0.9rem;">No tracks placed.</div>
-            </div>
-
-            <div class="tool-section admin-only">
-                <h3>Reference Image</h3>
-                <div class="ref-tools">
-                    <input type="file" id="refUpload" accept="image/*" style="display: none;">
-                    <button onclick="document.getElementById('refUpload').click()" class="btn-move-ref"
-                        style="margin-bottom: 8px;">Upload Image</button>
-
-                    <div class="ref-row">
-                        <span>Opacity</span>
-                        <input type="range" id="refOpacity" min="0" max="100" value="50">
-                    </div>
-                    <div class="ref-row">
-                        <span>Scale</span>
-                        <input type="range" id="refScale" min="1" max="1000" value="100">
-                    </div>
-
-                    <button id="toggleMoveRef" class="btn-move-ref">Move Reference</button>
-                    <p style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">* Hold Shift to Move Image while
-                        drawing</p>
+    <main class="map-app">
+        <aside class="map-panel">
+            <div class="brand-block">
+                <div class="brand-mark">M</div>
+                <div>
+                    <h1>Metro Map</h1>
+                    <p>Street-level mapping workspace.</p>
                 </div>
             </div>
 
+            <section class="panel-section">
+                <div class="section-title">Location</div>
+                <button id="gpsBtn" class="primary-btn" type="button">Use My GPS</button>
+                <div class="button-row">
+                    <button id="chicagoBtn" class="secondary-btn" type="button">Chicago</button>
+                    <button id="clearPinsBtn" class="secondary-btn danger" type="button">Clear Pins</button>
+                </div>
+                <div id="locationStatus" class="status-box">Map ready</div>
+            </section>
 
-        </div>
-    </div>
+            <section class="panel-section">
+                <div class="section-title">Selected Point</div>
+                <div class="coordinate-card">
+                    <span id="selectedLabel">No point selected</span>
+                    <strong id="selectedCoords">--</strong>
+                </div>
+            </section>
 
-    <script>
-        // Role-based UI control
-        (function() {
-            const role = sessionStorage.getItem('metro_role');
-            if (role === 'guest') {
-                document.body.classList.add('guest-mode');
-                // Disable file actions and editing tools (but NOT theme toggle)
-                const adminOnly = document.querySelectorAll('.save-load-group, .btn-clear, .toolbar, .admin-only');
-                adminOnly.forEach(el => {
-                    el.style.opacity = '0.5';
-                    el.style.pointerEvents = 'none';
-                    el.style.filter = 'grayscale(100%)';
-                });
-                
-                // Add a notice
-                const header = document.querySelector('.header-left');
-                const badge = document.createElement('span');
-                badge.textContent = 'GUEST MODE';
-                badge.style.cssText = 'background: #f59e0b; color: #000; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 10px; vertical-align: middle;';
-                header.querySelector('h1').appendChild(badge);
-            }
-        })();
-    </script>
+            <section class="panel-section">
+                <div class="section-title">Pathfinding</div>
+                <div class="button-row">
+                    <button id="pickStartBtn" class="secondary-btn active" type="button">Pick Start</button>
+                    <button id="pickEndBtn" class="secondary-btn" type="button">Pick End</button>
+                </div>
+                <button id="findPathBtn" class="primary-btn" type="button">Find Nearest Station Path</button>
+                <div id="pathResult" class="status-box">Click the map to set start and destination points.</div>
+            </section>
 
-    <!-- Hidden SVG Definitions -->
-    <svg width="0" height="0" style="position: absolute; overflow: hidden; display: none;">
-        <defs>
-            <g id="track-horiz">
-                <path d="M 0 20 L 40 20" stroke="currentColor" stroke-width="18" stroke-linecap="square" fill="none" />
-            </g>
-            <g id="track-curve">
-                <path d="M 20 0 A 20 20 0 0 0 40 20" stroke="currentColor" stroke-width="18" stroke-linecap="square"
-                    fill="none" />
-            </g>
-            <g id="track-diag">
-                <path d="M 0 0 L 13 0 L 0 13 Z M 40 40 L 27 40 L 40 27 Z" fill="currentColor" />
-                <path d="M -5 -5 L 45 45" stroke="currentColor" stroke-width="18" stroke-linecap="butt" fill="none" />
-            </g>
-            <!-- New: Straight to Diagonal 45-degree Turns -->
-            <g id="track-turn-dr">
-                <path d="M 0 20 L 20 20 L 45 45" stroke="currentColor" stroke-width="18" stroke-linecap="butt"
-                    stroke-linejoin="round" fill="none" />
-                <path d="M 40 40 L 27 40 L 40 27 Z" fill="currentColor" />
-            </g>
-            <g id="track-turn-ur">
-                <path d="M 0 20 L 20 20 L 45 -5" stroke="currentColor" stroke-width="18" stroke-linecap="butt"
-                    stroke-linejoin="round" fill="none" />
-                <path d="M 40 0 L 27 0 L 40 13 Z" fill="currentColor" />
-            </g>
-            <!-- Corner Filler -->
-            <g id="corner-fill">
-                <path d="M 0 0 L 13 0 L 0 13 Z" fill="currentColor" />
-            </g>
-            <!-- T-Junction (Opening to Bottom) -->
-            <g id="track-t-bot">
-                <path d="M 0 20 L 40 20 M 20 20 L 20 40" stroke="currentColor" stroke-width="18" stroke-linecap="square"
-                    stroke-linejoin="round" fill="none" />
-            </g>
-            <!-- One-Way Arrow Overlay -->
-            <g id="track-oneway-arrow">
-                <path d="M 15 10 L 25 20 L 15 30" stroke="#f1f5f9" stroke-width="6" stroke-linecap="round"
-                    stroke-linejoin="round" fill="none" />
-            </g>
-        </defs>
-    </svg>
+            <section class="panel-section pins-section">
+                <div class="section-title">Nearest Stations</div>
+                <div id="pinList" class="pin-list"></div>
+            </section>
+        </aside>
 
-    <!-- Modular Scripts (in dependency order) -->
-    <script src="js/constants.js"></script>
-    <script src="js/state.js"></script>
-    <script src="js/cells.js"></script>
-    <script src="js/history.js"></script>
-    <script src="js/viewport.js"></script>
-    <script src="js/preview.js"></script>
-    <script src="js/drawing.js"></script>
-    <script src="js/connections.js"></script>
-    <script src="js/tracktable.js"></script>
-    <script src="js/routing.js"></script>
-    <script src="js/fileio.js"></script>
-    <script src="js/toolbar.js"></script>
-    <script src="js/keyboard.js"></script>
-    <script src="js/refimage.js"></script>
-    <script src="js/liveplanner.js"></script>
-    <script src="js/main.js"></script>
+        <section class="map-stage">
+            <div class="map-toolbar">
+                <button id="zoomInBtn" class="icon-btn" type="button" aria-label="Zoom in">+</button>
+                <button id="zoomOutBtn" class="icon-btn" type="button" aria-label="Zoom out">-</button>
+            </div>
+            <div id="mapCanvas" class="map-canvas" role="application" aria-label="Interactive real map">
+                <div id="tileLayer" class="tile-layer"></div>
+                <div id="railTileLayer" class="rail-tile-layer"></div>
+                <svg id="edgeLayer" class="edge-layer"></svg>
+                <div id="stationLayer" class="station-layer"></div>
+                <div id="markerLayer" class="marker-layer"></div>
+                <div class="map-attribution">
+                    <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/pathfinding.js"></script>
+    <script src="js/mapapp.js"></script>
 </body>
 
 </html>
