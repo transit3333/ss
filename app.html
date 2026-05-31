@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metro Real Map</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <main class="map-app">
+        <aside class="map-panel">
+            <div class="brand-block">
+                <div class="brand-mark">M</div>
+                <div>
+                    <h1>Metro Map</h1>
+                    <p>Street-level mapping workspace.</p>
+                </div>
+            </div>
+
+            <section class="panel-section">
+                <div class="section-title">Location</div>
+                <div class="button-row">
+                    <button id="chicagoBtn" class="secondary-btn" type="button">Chicago</button>
+                    <button id="clearPinsBtn" class="secondary-btn danger" type="button">Clear Pins</button>
+                </div>
+                <div id="locationStatus" class="status-box">Map ready</div>
+            </section>
+
+            <section class="panel-section">
+                <div class="section-title">Selected Point</div>
+                <div class="coordinate-card">
+                    <span id="selectedLabel">No point selected</span>
+                    <strong id="selectedCoords">--</strong>
+                </div>
+            </section>
+
+            <section class="panel-section">
+                <div class="section-title">Pathfinding</div>
+                <div class="button-row">
+                    <button id="pickStartBtn" class="secondary-btn active" type="button">Pick Start</button>
+                    <button id="pickEndBtn" class="secondary-btn" type="button">Pick End</button>
+                </div>
+                <button id="findPathBtn" class="primary-btn" type="button">Find Nearest Station Path</button>
+                <div id="pathResult" class="status-box">Click the map to set start and destination points.</div>
+            </section>
+
+            <section class="panel-section">
+                <div class="section-title">Admin Edge Tools</div>
+                <div class="button-row">
+                    <button id="closeEdgeBtn" class="secondary-btn" type="button">Mark Unusable</button>
+                    <button id="openEdgeBtn" class="secondary-btn" type="button">Mark Usable</button>
+                </div>
+                <button id="clearClosedEdgesBtn" class="secondary-btn danger" type="button">Clear Unusable Edges</button>
+                <div id="edgeEditStatus" class="status-box">Choose a tool, then click a rail segment.</div>
+            </section>
+
+            <section class="panel-section pins-section">
+                <div class="section-title">Nearest Stations</div>
+                <div id="pinList" class="pin-list"></div>
+            </section>
+        </aside>
+
+        <section class="map-stage">
+            <div class="map-toolbar">
+                <button id="zoomInBtn" class="icon-btn" type="button" aria-label="Zoom in">+</button>
+                <button id="zoomOutBtn" class="icon-btn" type="button" aria-label="Zoom out">-</button>
+            </div>
+            <div id="mapCanvas" class="map-canvas" role="application" aria-label="Interactive real map">
+                <div id="tileLayer" class="tile-layer"></div>
+                <div id="railTileLayer" class="rail-tile-layer"></div>
+                <svg id="edgeLayer" class="edge-layer"></svg>
+                <div id="stationLayer" class="station-layer"></div>
+                <div id="markerLayer" class="marker-layer"></div>
+                <div class="map-attribution">
+                    <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/pathfinding.js"></script>
+    <script src="js/mapapp.js"></script>
+</body>
+
+</html>
